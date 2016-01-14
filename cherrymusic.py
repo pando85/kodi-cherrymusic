@@ -10,9 +10,9 @@ import urlparse
 import json
 
 # Set global values.
-version = "0.0.4"
+version = "0.1.0"
 plugin = 'CherryMusic-' + version
-author = 'Sets'
+author = 'Pando85'
 
 # XBMC Hooks
 PLUGIN = 'plugin.audio.cherrymusic'
@@ -27,10 +27,6 @@ username =  settings.getSetting('cherrymusicuser')
 password = settings.getSetting('cherrymusicpass')
 session_id = None
 
-#def debug(msg):
-#    f = open("/home/sets/.xbmc/temp/log.log", "w")
-#    f.write(msg)
-#    f.close()
 class UI(object):
     def __init__(self):
         pass
@@ -90,11 +86,23 @@ class UI(object):
         playlist = xbmc.PlayList(xbmc.PLAYLIST_MUSIC)
         playlist.clear()
         if data is not None:
-            for item in data['data']:
-                listitem = xbmcgui.ListItem('test')
-                listitem.setInfo(type='music', infoLabels={'title': item['label']})
-                url = urlparse.urljoin(host, "/serve/")
-                url = urlparse.urljoin(url, item['urlpath'])
+            for item in data['tracks']:
+                listitem = xbmcgui.ListItem(data['name'])
+                listitem.setInfo(
+                    type='music',
+                    infoLabels={
+                        'title': item['data']['meta_title'],
+                        'file_name': item['data']['filename'],
+#                        'artist': item['data']['meta_artist'],
+#                        'track_number': item['data']['meta_track'],
+#                        'album': item['data']['meta_album'],
+#                        'year': item['data']['meta_year'],
+#                        'genre': item['data']['meta_genre'],
+                    }
+                )
+
+                url = urlparse.urljoin(host, "/api/v1/stream/")
+                url = urlparse.urljoin(url, item['data']['path'])
                 playlist.add(url, listitem)
             xbmc.Player().play(playlist)
 
@@ -107,23 +115,23 @@ class UI(object):
 
     def categories_menu(self):
         """ Main Menu """
-        self.add_item(translated(30010),"",1)
-        self.add_item(translated(30011),"",2)
+#        self.add_item(translated(30010),"",1)
+#        self.add_item(translated(30011),"",2)
         self.add_item(translated(30012),"",3)
         self.end_of_directory()
 
     def show_playlists_menu(self, data):
         """ Load Playlist menu """
         if data is not None:
-            for item in data['data']:
-                self.add_item(item['title'], str(item['plid']),3)
+            for item in data:
+                self.add_item(item['name'], str(item['id']),3)
             self.end_of_directory()
 
     def search_menu(self, host, data):
         """ Load Playlist menu """
         if data is not None:
             for item in data['data']:
-                url = urlparse.urljoin(host, "/serve/")
+                url = urlparse.urljoin(host, "/api/v1/stream/")
                 url = urlparse.urljoin(url, item.get('urlpath'))
                 self.add_item(item.get("label"), url, 1)
             self.end_of_directory()
@@ -175,8 +183,8 @@ class Main(object):
 
     def login(self, host, username, password):
         """ Login to CherryMusic using POST method """
-        request = urllib2.Request(host)
-        data = urllib.urlencode({"username": username, "password": password, "login": "login"})
+        request = urllib2.Request(urlparse.urljoin(host, "api/v1/rest-auth/login/"))
+        data = urllib.urlencode({"username": username, "password": password})
         try:
             response = urllib2.urlopen(request, data=data)
         except urllib2.HTTPError:
@@ -207,7 +215,7 @@ class Main(object):
 
     def get_playlists(self):
         """ CherryMusic server returns available playlists, function returns deserialised data """
-        request = urllib2.Request(urlparse.urljoin(self.host, "api/showplaylists"))
+        request = urllib2.Request(urlparse.urljoin(self.host, "api/v1/playlist"))
         request.add_header("Cookie", self.session_id)
         try:
             response = urllib2.urlopen(request)
@@ -225,21 +233,19 @@ class Main(object):
 
     def get_playlist(self, id):
         """ CherryMusic server returns playlists by id, function returns deserialised data """
-        request = urllib2.Request(urlparse.urljoin(self.host, "api/loadplaylist"))
-        data = urllib.urlencode({"data": json.dumps({"playlistid": id})})
+        request = urllib2.Request(urlparse.urljoin(self.host, "api/v1/playlist/" + id ))
         request.add_header("Cookie", self.session_id)
-        response = urllib2.urlopen(request, data=data)
+        response = urllib2.urlopen(request)
         data = response.read()
         response.close()
         return json.loads(data)
 
     def search(self, text):
         """ CherryMusic server returns found tracks by sting, function returns deserialised data """
-        request = urllib2.Request(urlparse.urljoin(self.host, "api/search"))
-        data = urllib.urlencode({"data": json.dumps({"searchstring": text})})
+        request = urllib2.Request(urlparse.urljoin(self.host, "api/v1/search/?q=" + text))
         request.add_header("Cookie", self.session_id)
         try:
-            response = urllib2.urlopen(request, data=data)
+            response = urllib2.urlopen(request)
         except urllib2.HTTPError as e:
             if e.code == 401:
                 UI().show_message(translated(30013), translated(30014), 6000)

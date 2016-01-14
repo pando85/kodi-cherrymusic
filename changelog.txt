@@ -1,3 +1,7 @@
+[B]0.1.0[/B]
+Change queries for new cherrymusic API
+Removed: fanart
+
 [B]0.0.5[/B]
 Fixed: Add http:// to host if not exists
 Added: Note under host and port field in settings, to avoid implicit entry
